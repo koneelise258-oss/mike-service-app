@@ -7,6 +7,7 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export default function App() {
   const [view, setView] = useState('client'); // 'client' ou 'admin'
+  const [adminTab, setAdminTab] = useState('requests'); // 'requests' ou 'catalog'
   const [adminAuth, setAdminAuth] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
 
@@ -15,7 +16,11 @@ export default function App() {
   const [services, setServices] = useState([]);
   const [requests, setRequests] = useState([]);
 
-  // États du formulaire
+  // Formulaire Admin (Ajout de Marque & Service)
+  const [newBrandName, setNewBrandName] = useState('');
+  const [newServiceName, setNewServiceName] = useState('');
+
+  // Formulaire Client
   const [selectedBrand, setSelectedBrand] = useState('');
   const [modelName, setModelName] = useState('');
   const [selectedService, setSelectedService] = useState('');
@@ -24,7 +29,7 @@ export default function App() {
   const [whatsappPhone, setWhatsappPhone] = useState('');
   const [notes, setNotes] = useState('');
 
-  // États du moteur de négociation
+  // Moteur de négociation
   const [initialPrice] = useState(15000);
   const [minPrice] = useState(12000);
   const [agreedPrice, setAgreedPrice] = useState(15000);
@@ -44,12 +49,12 @@ export default function App() {
 
   const loadInitialData = async () => {
     try {
-      const { data: bData } = await supabase.from('brands').select('*');
+      const { data: bData } = await supabase.from('brands').select('*').order('name');
       if (bData && bData.length > 0) {
         setBrands(bData);
         setSelectedBrand(bData[0].name);
       }
-      const { data: sData } = await supabase.from('repair_services').select('*');
+      const { data: sData } = await supabase.from('repair_services').select('*').order('name');
       if (sData && sData.length > 0) {
         setServices(sData);
         setSelectedService(sData[0].name);
@@ -62,6 +67,32 @@ export default function App() {
   const fetchRequests = async () => {
     const { data } = await supabase.from('repair_requests').select('*').order('created_at', { ascending: false });
     if (data) setRequests(data);
+  };
+
+  const handleAddBrand = async (e) => {
+    e.preventDefault();
+    if (!newBrandName.trim()) return;
+    const { error } = await supabase.from('brands').insert([{ name: newBrandName.trim() }]);
+    if (!error) {
+      setNewBrandName('');
+      loadInitialData();
+      alert('Marque ajoutée avec succès !');
+    } else {
+      alert('Erreur lors de l\'ajout de la marque');
+    }
+  };
+
+  const handleAddService = async (e) => {
+    e.preventDefault();
+    if (!newServiceName.trim()) return;
+    const { error } = await supabase.from('repair_services').insert([{ name: newServiceName.trim() }]);
+    if (!error) {
+      setNewServiceName('');
+      loadInitialData();
+      alert('Service ajouté avec succès !');
+    } else {
+      alert('Erreur lors de l\'ajout du service');
+    }
   };
 
   const handleNegotiateDown = () => {
@@ -203,16 +234,7 @@ export default function App() {
                   value={selectedBrand}
                   onChange={(e) => setSelectedBrand(e.target.value)}
                 >
-                  {brands.length > 0 ? (
-                    brands.map(b => <option key={b.id} value={b.name}>{b.name}</option>)
-                  ) : (
-                    <>
-                      <option>Tecno</option>
-                      <option>Samsung</option>
-                      <option>Apple</option>
-                      <option>Infinix</option>
-                    </>
-                  )}
+                  {brands.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
                 </select>
 
                 {/* 2. Modèle */}
@@ -233,16 +255,7 @@ export default function App() {
                   value={selectedService}
                   onChange={(e) => setSelectedService(e.target.value)}
                 >
-                  {services.length > 0 ? (
-                    services.map(s => <option key={s.id} value={s.name}>{s.name}</option>)
-                  ) : (
-                    <>
-                      <option>Remplacement Écran</option>
-                      <option>Changement de Batterie</option>
-                      <option>Connecteur de charge</option>
-                      <option>Microsoudure / Carte Mère</option>
-                    </>
-                  )}
+                  {services.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
                 </select>
 
                 {/* 4. Qualité */}
@@ -333,37 +346,89 @@ export default function App() {
             </div>
           ) : (
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                <h2 style={{ fontSize: '20px', color: '#111' }}>📋 Demandes Récentes ({requests.length})</h2>
-                <button onClick={fetchRequests} style={styles.refreshBtn}>🔄 Actualiser</button>
+              {/* Tabs Admin */}
+              <div style={styles.adminTabNav}>
+                <button 
+                  onClick={() => setAdminTab('requests')}
+                  style={{ ...styles.tabBtn, backgroundColor: adminTab === 'requests' ? '#111111' : '#FFFFFF', color: adminTab === 'requests' ? '#FFFFFF' : '#111111' }}
+                >
+                  📋 Demandes Client
+                </button>
+                <button 
+                  onClick={() => setAdminTab('catalog')}
+                  style={{ ...styles.tabBtn, backgroundColor: adminTab === 'catalog' ? '#111111' : '#FFFFFF', color: adminTab === 'catalog' ? '#FFFFFF' : '#111111' }}
+                >
+                  ⚙️ Gestion Catalogue
+                </button>
               </div>
 
-              {requests.length === 0 ? (
-                <p style={{ color: '#888', textAlign: 'center', marginTop: '40px' }}>Aucune demande enregistrée.</p>
-              ) : (
-                <div style={{ display: 'grid', gap: '15px' }}>
-                  {requests.map((item) => (
-                    <div key={item.id} style={styles.adminCard}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #E8E8E6', paddingBottom: '8px', marginBottom: '8px' }}>
-                        <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#B89A5A' }}>{item.reference_no}</span>
-                        <span style={styles.priceTag}>{item.agreed_price} FCFA</span>
-                      </div>
-                      <p style={{ margin: '4px 0', fontSize: '14px', color: '#111' }}>👤 <strong>Client :</strong> {item.client_name}</p>
-                      <p style={{ margin: '4px 0', fontSize: '14px', color: '#111' }}>📱 <strong>Appareil :</strong> {item.brand_name} {item.model_name}</p>
-                      <p style={{ margin: '4px 0', fontSize: '14px', color: '#555' }}>🛠️ <strong>Service :</strong> {item.service_name} ({item.quality_name})</p>
-                      <p style={{ margin: '4px 0', fontSize: '14px', color: '#555' }}>📞 <strong>WhatsApp :</strong> {item.whatsapp_number}</p>
-                      {item.issue_description && <p style={{ margin: '4px 0', fontSize: '13px', color: '#777' }}>📝 <strong>Notes :</strong> {item.issue_description}</p>}
-                      
-                      <a 
-                        href={`https://wa.me/${item.whatsapp_number ? item.whatsapp_number.replace(/[^0-9]/g, '') : ''}`}
-                        target="_blank" 
-                        rel="noreferrer"
-                        style={styles.adminWhatsappLink}
-                      >
-                        💬 Répondre directement
-                      </a>
+              {adminTab === 'requests' ? (
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                    <h2 style={{ fontSize: '18px', color: '#111' }}>Demandes Récentes ({requests.length})</h2>
+                    <button onClick={fetchRequests} style={styles.refreshBtn}>🔄 Actualiser</button>
+                  </div>
+
+                  {requests.length === 0 ? (
+                    <p style={{ color: '#888', textAlign: 'center', marginTop: '40px' }}>Aucune demande enregistrée.</p>
+                  ) : (
+                    <div style={{ display: 'grid', gap: '15px' }}>
+                      {requests.map((item) => (
+                        <div key={item.id} style={styles.adminCard}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #E8E8E6', paddingBottom: '8px', marginBottom: '8px' }}>
+                            <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#B89A5A' }}>{item.reference_no}</span>
+                            <span style={styles.priceTag}>{item.agreed_price} FCFA</span>
+                          </div>
+                          <p style={{ margin: '4px 0', fontSize: '14px', color: '#111' }}>👤 <strong>Client :</strong> {item.client_name}</p>
+                          <p style={{ margin: '4px 0', fontSize: '14px', color: '#111' }}>📱 <strong>Appareil :</strong> {item.brand_name} {item.model_name}</p>
+                          <p style={{ margin: '4px 0', fontSize: '14px', color: '#555' }}>🛠️ <strong>Service :</strong> {item.service_name} ({item.quality_name})</p>
+                          <p style={{ margin: '4px 0', fontSize: '14px', color: '#555' }}>📞 <strong>WhatsApp :</strong> {item.whatsapp_number}</p>
+                          {item.issue_description && <p style={{ margin: '4px 0', fontSize: '13px', color: '#777' }}>📝 <strong>Notes :</strong> {item.issue_description}</p>}
+                          
+                          <a 
+                            href={`https://wa.me/${item.whatsapp_number ? item.whatsapp_number.replace(/[^0-9]/g, '') : ''}`}
+                            target="_blank" 
+                            rel="noreferrer"
+                            style={styles.adminWhatsappLink}
+                          >
+                            💬 Répondre directement
+                          </a>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  )}
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gap: '20px' }}>
+                  {/* Ajouter une marque */}
+                  <div style={styles.card}>
+                    <h3 style={styles.cardTitle}>➕ Ajouter une Marque</h3>
+                    <form onSubmit={handleAddBrand} style={{ display: 'flex', gap: '10px' }}>
+                      <input 
+                        type="text" 
+                        style={{ ...styles.input, flex: 1 }} 
+                        placeholder="Ex: Xiaomi, Huawei, Honor..."
+                        value={newBrandName}
+                        onChange={(e) => setNewBrandName(e.target.value)}
+                      />
+                      <button type="submit" style={{ ...styles.submitBtn, marginTop: 0, padding: '10px 15px' }}>Ajouter</button>
+                    </form>
+                  </div>
+
+                  {/* Ajouter un service */}
+                  <div style={styles.card}>
+                    <h3 style={styles.cardTitle}>🛠️ Ajouter un Service de Réparation</h3>
+                    <form onSubmit={handleAddService} style={{ display: 'flex', gap: '10px' }}>
+                      <input 
+                        type="text" 
+                        style={{ ...styles.input, flex: 1 }} 
+                        placeholder="Ex: Déblocage Réseau, Changement Caméra..."
+                        value={newServiceName}
+                        onChange={(e) => setNewServiceName(e.target.value)}
+                      />
+                      <button type="submit" style={{ ...styles.submitBtn, marginTop: 0, padding: '10px 15px' }}>Ajouter</button>
+                    </form>
+                  </div>
                 </div>
               )}
             </div>
@@ -374,7 +439,6 @@ export default function App() {
   );
 }
 
-// PALETTE CIBLÉE : 90% Blanc Cassé, 6% Noir, 2% Or, Accents 2%
 const styles = {
   body: { backgroundColor: '#FAFAF8', color: '#111111', minHeight: '100vh', fontFamily: 'system-ui, -apple-system, sans-serif', paddingBottom: '40px' },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 20px', backgroundColor: '#FFFFFF', borderBottom: '1px solid #E8E8E6' },
@@ -388,19 +452,4 @@ const styles = {
   badge: { backgroundColor: '#FFFFFF', color: '#B89A5A', padding: '6px 14px', borderRadius: '20px', fontSize: '12px', border: '1px solid #B89A5A', fontWeight: 'bold' },
   heroTitle: { fontSize: '24px', margin: '15px 0 10px 0', lineHeight: '1.3', color: '#111111' },
   heroSub: { color: '#666666', fontSize: '14px', margin: 0 },
-  card: { backgroundColor: '#FFFFFF', borderRadius: '16px', padding: '20px', border: '1px solid #E8E8E6', boxShadow: '0 4px 15px rgba(0,0,0,0.03)' },
-  cardTitle: { fontSize: '16px', margin: '0 0 12px 0', color: '#111111', borderBottom: '1px solid #F0F0EE', paddingBottom: '8px' },
-  form: { display: 'flex', flexDirection: 'column', gap: '10px' },
-  label: { fontSize: '12px', color: '#444444', fontWeight: 'bold', textTransform: 'uppercase', marginTop: '4px' },
-  input: { backgroundColor: '#FAFAF8', border: '1px solid #E8E8E6', color: '#111111', padding: '12px', borderRadius: '8px', fontSize: '14px', outline: 'none' },
-  negotiationBox: { backgroundColor: '#FAFAF8', border: '1px solid #B89A5A', borderRadius: '10px', padding: '15px', marginTop: '10px' },
-  negoBtn: { backgroundColor: '#FFFFFF', border: '1px solid #E8E8E6', color: '#111111', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' },
-  submitBtn: { backgroundColor: '#111111', color: '#FFFFFF', fontWeight: 'bold', border: 'none', padding: '15px', borderRadius: '8px', cursor: 'pointer', fontSize: '15px', marginTop: '15px' },
-  successBox: { textAlign: 'center', padding: '10px' },
-  whatsappBtn: { display: 'inline-block', backgroundColor: '#25D366', color: '#FFFFFF', padding: '14px 20px', borderRadius: '8px', textDecoration: 'none', fontWeight: 'bold', fontSize: '15px', width: '100%', boxSizing: 'border-box', marginTop: '10px' },
-  resetBtn: { backgroundColor: 'transparent', border: 'none', color: '#666666', textDecoration: 'underline', marginTop: '15px', cursor: 'pointer', fontSize: '13px' },
-  adminCard: { backgroundColor: '#FFFFFF', padding: '15px', borderRadius: '10px', border: '1px solid #E8E8E6' },
-  priceTag: { backgroundColor: '#B89A5A', color: '#FFFFFF', padding: '3px 8px', borderRadius: '6px', fontWeight: 'bold', fontSize: '12px' },
-  adminWhatsappLink: { display: 'inline-block', marginTop: '10px', backgroundColor: '#111111', color: '#FFFFFF', padding: '8px 12px', borderRadius: '6px', textDecoration: 'none', fontSize: '12px', fontWeight: 'bold' },
-  refreshBtn: { backgroundColor: '#FFFFFF', color: '#111111', border: '1px solid #E8E8E6', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer' }
-};
+  card: { backgroundColor: '#FFFFFF', borderRadius: '16px', padding: '20px', border: '1px solid #E
